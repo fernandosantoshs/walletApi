@@ -18,6 +18,7 @@
   "dependencies": {
     "fastify": "^4.28.0",
     "knex": "^3.1.0",
-    "sqlite3": "^5.1.7"
+    "sqlite3": "^5.1.7",
+    "zod": "^3.23.8"
   }
 }
