@@ -34,6 +34,21 @@ export async function transactionsRoutes(app: FastifyInstance) {
     transactionId: string;
   }
 
+  app.put('/transaction/:transactionId', async (request, reply) => {
+    const { transactionId } = request.params as TransactionRequestParams;
+
+    const { title, amount } = request.body as TransactionRequestBody;
+
+    if (!title && !amount)
+      return reply.code(400).send('Error: Both values are null');
+
+    const updateTransaction = await knex('transactions')
+      .where('id', transactionId)
+      .update({ title, amount });
+
+    return reply.send(updateTransaction);
+  });
+
   app.delete('/transaction/:transactionId', async (request, reply) => {
     const { transactionId } = request.params as TransactionRequestParams;
 
