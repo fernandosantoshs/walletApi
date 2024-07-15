@@ -54,9 +54,7 @@ export async function transactionsRoutes(app: FastifyInstance) {
     const { title, amount } = putTransactionSchema.parse(request.body);
 
     if (!title && !amount)
-      return reply
-        .code(400)
-        .send('Error: At least one value must be fullfiled');
+      return reply.code(400).send('Error: At least one value must be filled');
 
     const updateTransaction = await knex('transactions')
       .where('id', transactionId)
