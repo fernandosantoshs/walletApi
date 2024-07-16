@@ -1,85 +1,151 @@
-import crypto from 'node:crypto';
-import { z } from 'zod';
-import { knex } from '../database';
 import { FastifyInstance } from 'fastify';
+import { z } from 'zod';
+import crypto from 'node:crypto';
+import { knex } from '../database';
+import { checkSessionIdExists } from '../middlewares/check-session-id-exists';
 
 export async function transactionsRoutes(app: FastifyInstance) {
   app.post('/', async (request, reply) => {
-    const createTransactionSchema = z.object({
+    const createTransactionBodySchema = z.object({
       title: z.string(),
       amount: z.number(),
       type: z.enum(['debit', 'credit']),
     });
 
-    const { title, amount, type } = createTransactionSchema.parse(request.body);
+    const { title, amount, type } = createTransactionBodySchema.parse(
+      request.body
+    );
 
-    const transaction = await knex('transactions').insert({
+    let sessionId = request.cookies.sessionId;
+
+    if (!sessionId) {
+      sessionId = crypto.randomUUID();
+
+      reply.cookie('sessionId', sessionId, {
+        path: '/',
+        maxAge: 60 * 60 * 24 * 7, // 7 days (in seconds)
+      });
+    }
+
+    await knex('transactions').insert({
       id: crypto.randomUUID(),
       title,
       amount: type === 'credit' ? amount : amount * -1,
+      session_id: sessionId,
     });
 
-    return reply.status(201).send(transaction);
+    return reply.status(201).send();
   });
 
-  app.get('/', async () => {
-    const transactions = await knex('transactions').select('*');
+  app.get(
+    '/',
+    {
+      preHandler: [checkSessionIdExists],
+    },
+    async (request, reply) => {
+      const { sessionId } = request.cookies;
 
-    return transactions;
-  });
+      const transactions = await knex('transactions')
+        .where('session_id', sessionId)
+        .select('*');
 
-  app.get('/:id', async (request, reply) => {
-    const getTransactionParamsSchema = z.object({
-      id: z.string().uuid(),
-    });
+      return transactions;
+    }
+  );
 
-    const { id } = getTransactionParamsSchema.parse(request.params);
+  app.get(
+    '/:id',
+    {
+      preHandler: [checkSessionIdExists],
+    },
+    async (request, reply) => {
+      const getTransactionParamsSchema = z.object({
+        id: z.string().uuid(),
+      });
 
-    const transaction = await knex('transactions').where('id', id).first();
+      const { id } = getTransactionParamsSchema.parse(request.params);
 
-    return { transaction };
-  });
+      const { sessionId } = request.cookies;
 
-  app.get('/summary', async (request, reply) => {
-    const summary = await knex('transactions')
-      .sum('amount', { as: 'amount' })
-      .first();
+      const transaction = await knex('transactions')
+        .where({ session_id: sessionId, id })
+        .first();
 
-    return { summary };
-  });
+      return { transaction };
+    }
+  );
 
-  app.put('/:id', async (request, reply) => {
-    const putTransactionSchema = z.object({
-      id: z.string(),
-      title: z.string(),
-      amount: z.number(),
-    });
+  app.get(
+    '/summary',
+    {
+      preHandler: [checkSessionIdExists],
+    },
+    async (request, reply) => {
+      const { sessionId } = request.cookies;
 
-    const { id: transactionId } = putTransactionSchema.parse(request.params);
+      const summary = await knex('transactions')
+        .where('session_id', sessionId)
+        .sum('amount', { as: 'amount' })
+        .first();
 
-    const { title, amount } = putTransactionSchema.parse(request.body);
+      return { summary };
+    }
+  );
 
-    if (!title && !amount)
-      return reply.code(400).send('Error: At least one value must be filled');
+  app.put(
+    '/:id',
+    {
+      preHandler: [checkSessionIdExists],
+    },
+    async (request, reply) => {
+      const putTransactionSchema = z.object({
+        id: z.string(),
+        title: z.string(),
+        amount: z.number(),
+      });
 
-    const updateTransaction = await knex('transactions')
-      .where('id', transactionId)
-      .update({ title, amount });
+      const { id } = putTransactionSchema.parse(request.params);
 
-    return reply.send(updateTransaction);
-  });
+      const { sessionId } = request.cookies;
 
-  app.delete('/:transactionId', async (request, reply) => {
-    const deleteTransactionSchema = z.object({
-      transactionId: z.string(),
-    });
+      const { title, amount } = putTransactionSchema.parse(request.body);
 
-    const { transactionId } = deleteTransactionSchema.parse(request.params);
+      if (!title && !amount)
+        return reply.code(400).send('Error: At least one value must be filled');
 
-    const transaction = await knex('transactions')
-      .where('id', transactionId)
-      .del();
+      const updateTransaction = await knex('transactions')
+        .where({
+          id,
+          session_id: sessionId,
+        })
+        .update({ title, amount });
 
-    return reply.status(200).send(transaction);
-  });
+      return reply.send(updateTransaction);
+    }
+  );
+
+  app.delete(
+    '/:id',
+    {
+      preHandler: [checkSessionIdExists],
+    },
+    async (request, reply) => {
+      const deleteTransactionParamsSchema = z.object({
+        id: z.string(),
+      });
+
+      const { id } = deleteTransactionParamsSchema.parse(request.params);
+
+      const { sessionId } = request.cookies;
+
+      const transaction = await knex('transactions')
+        .where({
+          session_id: sessionId,
+          id,
+        })
+        .del();
+
+      return reply.status(200).send(transaction);
+    }
+  );
 }
