@@ -28,28 +28,34 @@ export async function transactionsRoutes(app: FastifyInstance) {
     return transactions;
   });
 
-  app.get('/:transactionId', async (request, reply) => {
-    const getTransactionSchema = z.object({
-      transactionId: z.string(),
+  app.get('/:id', async (request, reply) => {
+    const getTransactionParamsSchema = z.object({
+      id: z.string().uuid(),
     });
 
-    const { transactionId } = getTransactionSchema.parse(request.params);
+    const { id } = getTransactionParamsSchema.parse(request.params);
 
-    const transaction = await knex('transactions')
-      .where('id', transactionId)
-      .select('*');
+    const transaction = await knex('transactions').where('id', id).first();
 
-    return reply.status(200).send(transaction);
+    return { transaction };
   });
 
-  app.put('/:transactionId', async (request, reply) => {
+  app.get('/summary', async (request, reply) => {
+    const summary = await knex('transactions')
+      .sum('amount', { as: 'amount' })
+      .first();
+
+    return { summary };
+  });
+
+  app.put('/:id', async (request, reply) => {
     const putTransactionSchema = z.object({
-      transactionId: z.string(),
-      title: z.string().nullable(),
-      amount: z.number().nullable(),
+      id: z.string(),
+      title: z.string(),
+      amount: z.number(),
     });
 
-    const { transactionId } = putTransactionSchema.parse(request.params);
+    const { id: transactionId } = putTransactionSchema.parse(request.params);
 
     const { title, amount } = putTransactionSchema.parse(request.body);
 
