@@ -1,4 +1,4 @@
-import fastify from 'fastify';
+import fastify, { FastifyRequest } from 'fastify';
 import cookie from '@fastify/cookie';
 import { env } from './env';
 import { transactionsRoutes } from './routes/transactions';

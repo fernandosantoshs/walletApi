@@ -37,6 +37,12 @@ export async function transactionsRoutes(app: FastifyInstance) {
     return reply.status(201).send();
   });
 
+  app.get('/all', async (request, reply) => {
+    const transactions = await knex('transactions').select('*');
+
+    return reply.status(200).send(transactions);
+  });
+
   app.get(
     '/',
     {
@@ -140,10 +146,15 @@ export async function transactionsRoutes(app: FastifyInstance) {
 
       const transaction = await knex('transactions')
         .where({
-          session_id: sessionId,
+          //session_id: sessionId,
           id,
         })
         .del();
+
+      if (!transaction)
+        return reply
+          .status(404)
+          .send({ message: 'Wrong session id or transaction not found' });
 
       return reply.status(200).send(transaction);
     }
