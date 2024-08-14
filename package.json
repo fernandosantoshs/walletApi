@@ -13,6 +13,7 @@
   "description": "",
   "devDependencies": {
     "@types/node": "^20.14.7",
+    "@types/supertest": "^6.0.2",
     "supertest": "^7.0.0",
     "tsx": "^4.15.7",
     "typescript": "^5.5.2",
