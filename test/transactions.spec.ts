@@ -13,8 +13,8 @@ describe('Transactions Routes', () => {
   });
 
   beforeEach(async () => {
-    execSync('npm run knex migrate:rollback --all');
-    execSync('npm run knex migrate:latest');
+    execSync('npm run knex -- migrate:rollback --all');
+    execSync('npm run knex -- migrate:latest');
   });
 
   it('should be able to create a new transaction', async () => {
@@ -77,5 +77,27 @@ describe('Transactions Routes', () => {
     expect(listSpecificTransactionReponse.body.transaction).toEqual(
       expect.objectContaining({ title: 'Coxinha', amount: -30 })
     );
+  });
+
+  it('should be able to get the summary', async () => {
+    const createCreditTransactionResponse = await request(app.server)
+      .post('/transactions')
+      .send({ title: 'Freelance', amount: 8000, type: 'credit' })
+      .expect(201);
+
+    const cookies = createCreditTransactionResponse.get('Set-Cookie') ?? [];
+
+    await request(app.server)
+      .post('/transactions')
+      .set('Cookie', cookies)
+      .send({ title: 'New VGA board', amount: 1500, type: 'debit' })
+      .expect(201);
+
+    const getSummaryResponse = await request(app.server)
+      .get('/transactions/summary')
+      .set('Cookie', cookies)
+      .expect(200);
+
+    expect(getSummaryResponse.body.summary).toEqual({ amount: 6500 });
   });
 });
